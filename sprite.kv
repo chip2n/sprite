@@ -1,4 +1,27 @@
-GridLayout:
-  cols:3
-  Label:
-    text: 'HEJJ'
+<SpriteWidget>:
+    SpriteSplitter:
+        id: splitter1
+        sizable_from: 'right'
+        size: 200, root.height
+        min_size: 0
+        max_size: 200
+        BoxLayout:
+            Label:
+                font_size: 50
+                text: "Hej"
+
+    Splitter:
+        id: splitter2
+        sizable_from: 'top'
+        size: root.width, 200
+        min_size: 0
+        max_size: 200
+        BoxLayout:
+            canvas:
+
+    Label:
+        font_size: 70
+        center_x: root.width * 3/4
+        top: root.top - 50
+        text: "0"
+
