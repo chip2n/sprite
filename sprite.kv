@@ -1,27 +1,48 @@
 <SpriteWidget>:
-    SpriteSplitter:
-        id: splitter1
-        sizable_from: 'right'
-        size: 200, root.height
-        min_size: 0
-        max_size: 200
-        BoxLayout:
-            Label:
-                font_size: 50
-                text: "Hej"
-
-    Splitter:
-        id: splitter2
-        sizable_from: 'top'
-        size: root.width, 200
-        min_size: 0
-        max_size: 200
-        BoxLayout:
+    FloatLayout:
+        canvas:
+            Color:
+                rgb: 1, 1, 1
+            Rectangle:
+                size: root.size
+                pos: root.pos
+        CanvasWidget:
+            id: canvas
+        SpriteSplitter:
+            id: splitter1
+            orientation: 'horizontal'
             canvas:
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            sizable_from: 'right'
+            size: 200, root.height
+            min_size: 0
+            max_size: 200
+            BoxLayout:
+                canvas:
+                    Color:
+                        rgb: 1, 1, 0
+                    Rectangle:
+                        size: self.size
+                        pos: self.pos
+            Button:
+                size: 20, root.height
+                size_hint: (None, None)
 
-    Label:
-        font_size: 70
-        center_x: root.width * 3/4
-        top: root.top - 50
-        text: "0"
-
+<CanvasWidget>:
+    on_size: self.resize()
+    size: (512, 512)
+    pos: (0, 0)
+    scale: 1
+    canvas:
+        Color:
+            rgb: 0, 0, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    GridWidget:
+        size: root.size
+        pos: root.pos
+        lines: (10,10)
+        scale: root.scale
