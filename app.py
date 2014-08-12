@@ -1,6 +1,7 @@
 import kivy
 kivy.require('1.8.0')
 
+from array import array
 from kivy.app import App
 from kivy.uix.label import Label
 from kivy.uix.widget import Widget
@@ -10,7 +11,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.core.window import Window
 from kivy.properties import ObjectProperty, NumericProperty
-from kivy.graphics import Line, Color
+from kivy.graphics import Line, Color, Rectangle
+from kivy.graphics.texture import Texture
 
 from PIL import Image
 
@@ -26,6 +28,7 @@ class SpriteWidget(Widget):
 class CanvasWidget(FloatLayout):
     canvas_size = ObjectProperty((512, 512))
     scale = NumericProperty(1)
+    texture = ObjectProperty()
     touch_type = 'move'
 
     @property
@@ -43,7 +46,28 @@ class CanvasWidget(FloatLayout):
         self.pixels = self.img.load()
         for i in range(self.img.size[0]):
             for j in range(self.img.size[1]):
-                pixels[i,j] = (i, j, 100)
+                self.pixels[i,j] = (255, 255, 100)
+
+        self.bind(texture=self.on_texture_update)
+        self.bind(pos=self.on_texture_update)
+        self.bind(size=self.on_texture_update)
+
+        self.texture = Texture.create(size=(512,512))
+        size = 512*512*3
+        buf = [int(x*255/size) for x in range(size)]
+        arr = array('B', buf)
+        self.texture.blit_buffer(arr, colorfmt='rgb', bufferfmt='ubyte')
+
+    def on_texture_update(self, instance=None, value=None):
+        self.canvas.clear()
+        with self.canvas:
+            Color(1, 1, 0, mode='rgb')
+            #Rectangle(texture=self.texture, pos=self.pos, size=self.size)
+            Rectangle(pos=self.pos, size=self.size)
+
+        if 'grid' in self.ids:
+            print('YEEEEASH')
+            self.ids.grid.draw_grid()
 
     def _keyboard_closed(self):
         self._keyboard.unbind(on_key_down=self._on_keyboard_down)
@@ -56,14 +80,21 @@ class CanvasWidget(FloatLayout):
             self.touch_type = 'draw'
 
     def on_touch_down(self, touch):
-        print(self.scaled_size)
         if touch.button == 'scrolldown':
             print('Zoomin\' in')
-            self.set_scale(self.scale + 0.2)
+            self.set_scale(self.scale * 1.2)
         elif touch.button == 'scrollup':
             print('Zoomin\' out')
-            self.set_scale(self.scale - 0.2)
+            self.set_scale(self.scale / 1.2)
 
+        if self.touch_type == 'draw':
+            x,y = touch.pos
+            ratio = self.canvas_size[0] / self.scaled_size[0]
+            print('ScaledSize: %s,%s' % self.scaled_size)
+            print('CanvasSize: %s' % str(self.canvas_size))
+            print('Size: %s' % str(self.size))
+            print('Ratio: %s' % ratio)
+            print('Scale: %s' % self.scale)
         if self.collide_point(*touch.pos):
             touch.grab(self)
         return True
@@ -74,12 +105,6 @@ class CanvasWidget(FloatLayout):
         self.scale = scale
         self.size = [w * self.scale, h * self.scale]
 
-    def zoom(self, amount):
-        w, h = self.canvas_size
-        self.canvas_size = [w+amount, h+amount]
-        x, y = self.pos
-        self.pos = [x-amount/2, y-amount/2]
-    
     def on_touch_move(self, touch):
         if touch.grab_current == self:
             if self.touch_type == 'move':
@@ -87,14 +112,16 @@ class CanvasWidget(FloatLayout):
                 dx, dy = touch.dpos
                 self.pos = (x+dx, y+dy)
             elif self.touch_type == 'draw':
-                print('Drawing on pixels %s' % str(self.project(touch.pos)))
+                x,y = self.project(touch.pos)
+                print('Drawing on pixels %s,%s' % (int(x), int(y)))
                 
         return True
 
     def project(self, point):
         px,py = point
         x, y = self.pos
-        return (px-x, py-y)
+        ratio = self.canvas_size[0]/self.size[0]
+        return (ratio*(px-x), ratio*(py-y))
 
     def on_touch_up(self, touch):
         if touch.grab_current == self:
@@ -114,7 +141,9 @@ class CanvasWidget(FloatLayout):
 
 class GridWidget(Widget):
     lines = ObjectProperty((10,10))
-    visible = ObjectProperty(False)
+    visibility_density = ObjectProperty(10)
+    visible = ObjectProperty(True)
+    
     def __init__(self, **kwargs):
         super(GridWidget, self).__init__(**kwargs)
 
@@ -128,8 +157,20 @@ class GridWidget(Widget):
 
                 for i in range(0,self.lines[0]):
                     x_density = self.width / self.lines[0]
-                    x = x_density*i + self.pos[0]
-                    Line(points=[x, self.pos[1], x, self.height + self.pos[1]], width=1)
+                    if x_density > self.visibility_density:
+                        x = x_density*i + self.pos[0]
+                        if x > 0 and x < Window.size[0]:
+                            Color(0, 0, 0, mode='rgb')
+                            Line(points=[x, self.pos[1], x, self.height + self.pos[1]], width=1)
+
+                for i in range(0,self.lines[1]):
+                    y_density = self.height / self.lines[1]
+                    if y_density > self.visibility_density:
+                        y = y_density*i + self.pos[1]
+                        if y > 0 and y < Window.size[1]:
+                            Color(0, 0, 0, mode='rgb')
+                            Line(points=[self.pos[0], y, self.pos[0] + self.width, y], width=1)
+
 
             self.bind(pos=self.draw_grid)
             self.bind(size=self.draw_grid)
