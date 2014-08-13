@@ -11,7 +11,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.core.window import Window
 from kivy.properties import ObjectProperty, NumericProperty
-from kivy.graphics import Line, Color, Rectangle
+from kivy.graphics import Line, Color, Rectangle, InstructionGroup
 from kivy.graphics.texture import Texture
 
 from PIL import Image
@@ -48,9 +48,6 @@ class CanvasWidget(FloatLayout):
             for j in range(self.img.size[1]):
                 self.pixels[i,j] = (255, 255, 100)
 
-        self.bind(texture=self.on_texture_update)
-        self.bind(pos=self.on_texture_update)
-        self.bind(size=self.on_texture_update)
 
         self.texture = Texture.create(size=(512,512))
         size = 512*512*3
@@ -58,16 +55,29 @@ class CanvasWidget(FloatLayout):
         arr = array('B', buf)
         self.texture.blit_buffer(arr, colorfmt='rgb', bufferfmt='ubyte')
 
-    def on_texture_update(self, instance=None, value=None):
-        self.canvas.clear()
         with self.canvas:
-            Color(1, 1, 0, mode='rgb')
-            #Rectangle(texture=self.texture, pos=self.pos, size=self.size)
-            Rectangle(pos=self.pos, size=self.size)
+            self.test = InstructionGroup()
+            self.test.add(Color(1, 1, 0, mode='rgb'))
+            self.test.add(Rectangle(texture=self.texture, pos=self.pos, size=self.size, group='heh'))
 
-        if 'grid' in self.ids:
-            print('YEEEEASH')
-            self.ids.grid.draw_grid()
+        #self.bind(texture=self.on_texture_update)
+        self.bind(pos=self.on_texture_update)
+        self.bind(size=self.on_texture_update)
+
+    def on_texture_update(self, instance=None, value=None):
+        for inst in self.test.get_group('heh'):
+            if hasattr(inst, 'pos'):
+                inst.pos = self.pos
+            if hasattr(inst, 'size'):
+                inst.size = self.size
+        pass
+
+        #self.canvas.clear()
+        #with self.canvas:
+        #    Color(1, 1, 0, mode='rgb')
+        #    #Rectangle(texture=self.texture, pos=self.pos, size=self.size)
+        #    Rectangle(pos=self.pos, size=self.size)
+
 
     def _keyboard_closed(self):
         self._keyboard.unbind(on_key_down=self._on_keyboard_down)
@@ -140,21 +150,20 @@ class CanvasWidget(FloatLayout):
         pass
 
 class GridWidget(Widget):
-    lines = ObjectProperty((10,10))
-    visibility_density = ObjectProperty(10)
+    lines = ObjectProperty((512,512))
+    visibility_density = ObjectProperty(512)
     visible = ObjectProperty(True)
     
     def __init__(self, **kwargs):
         super(GridWidget, self).__init__(**kwargs)
 
-        self.draw_grid()
+        self.bind(pos=self.draw_grid)
+        self.bind(size=self.draw_grid)
     
     def draw_grid(self, instance=None, value=None):
         if self.visible:
             self.canvas.clear()
             with self.canvas:
-                Color(1, 0, 0, mode='rgb')
-
                 for i in range(0,self.lines[0]):
                     x_density = self.width / self.lines[0]
                     if x_density > self.visibility_density:
@@ -172,8 +181,6 @@ class GridWidget(Widget):
                             Line(points=[self.pos[0], y, self.pos[0] + self.width, y], width=1)
 
 
-            self.bind(pos=self.draw_grid)
-            self.bind(size=self.draw_grid)
 
 class SpriteApp(App):
     def build(self):

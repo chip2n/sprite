@@ -35,12 +35,6 @@
     size: (512, 512)
     pos: (0, 0)
     scale: 1
-    canvas:
-        Color:
-            rgb: 0, 0, 1
-        Rectangle:
-            size: self.size
-            pos: self.pos
     GridWidget:
         id: grid
         size: root.size
@@ -48,4 +42,4 @@
         lines: (512, 512)
         scale: root.scale
         visible: True
-        visibility_density: 10
+        visibility_density: 1
