@@ -8,32 +8,28 @@
                 pos: root.pos
         CanvasWidget:
             id: canvas
+            pos: (root.center_x/2, root.center_y/2)
         SpriteSplitter:
             id: splitter1
-            orientation: 'horizontal'
-            canvas:
-                Rectangle:
-                    size: self.size
-                    pos: self.pos
             sizable_from: 'right'
             size: 200, root.height
             min_size: 0
             max_size: 200
-            BoxLayout:
-                canvas:
-                    Color:
-                        rgb: 1, 1, 0
-                    Rectangle:
-                        size: self.size
-                        pos: self.pos
-            Button:
-                size: 20, root.height
-                size_hint: (None, None)
+            position: 'left'
+
+        SpriteSplitter:
+            id: splitter2
+            sizable_from: 'top'
+            size: root.width, 200
+            min_size: 0
+            max_size: 200
+            position: 'bottom'
+            Palette:
+                id: palette
 
 <CanvasWidget>:
     on_size: self.resize()
     size: (512, 512)
-    pos: (0, 0)
     scale: 1
     GridWidget:
         id: grid
@@ -42,4 +38,28 @@
         lines: (512, 512)
         scale: root.scale
         visible: True
-        visibility_density: 1
+        visibility_density: 10
+
+<SpriteSplitter>:
+    orientation: 'horizontal'
+    canvas:
+        Color:
+            rgb: 1,0,1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    handle_size: 30
+
+<PaletteColor>:
+    canvas:
+        Color:
+            rgba: self.color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<Palette>:
+    cols: 10
+    rows: 4
+    color_width: 50
+    size_hint: (None, None)

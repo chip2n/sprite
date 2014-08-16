@@ -1,6 +1,10 @@
 import kivy
 kivy.require('1.8.0')
 
+import events
+import palette
+
+import itertools
 from array import array
 from kivy.app import App
 from kivy.uix.label import Label
@@ -10,9 +14,11 @@ from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.core.window import Window
-from kivy.properties import ObjectProperty, NumericProperty
+from kivy.core.image import Image
+from kivy.properties import ObjectProperty, NumericProperty, ListProperty, StringProperty
 from kivy.graphics import Line, Color, Rectangle, InstructionGroup
 from kivy.graphics.texture import Texture
+import random
 
 from PIL import Image
 
@@ -30,6 +36,7 @@ class CanvasWidget(FloatLayout):
     scale = NumericProperty(1)
     texture = ObjectProperty()
     touch_type = 'move'
+    current_color = [0,0,0,1]
 
     @property
     def scaled_size(self):
@@ -42,22 +49,23 @@ class CanvasWidget(FloatLayout):
         self._keyboard = Window.request_keyboard(self._keyboard_closed, self)
         self._keyboard.bind(on_key_down=self._on_keyboard_down)
 
-        self.img = Image.new('RGB', (255,255), "black")
-        self.pixels = self.img.load()
-        for i in range(self.img.size[0]):
-            for j in range(self.img.size[1]):
-                self.pixels[i,j] = (255, 255, 100)
 
-
+        self.img = Image.open('test.png')
+        self.img = self.img =  self.img.transpose(Image.FLIP_TOP_BOTTOM)
         self.texture = Texture.create(size=(512,512))
+        self.texture.mag_filter = 'nearest'
         size = 512*512*3
-        buf = [int(x*255/size) for x in range(size)]
-        arr = array('B', buf)
-        self.texture.blit_buffer(arr, colorfmt='rgb', bufferfmt='ubyte')
+        buf = []
+        for r,g,b,a in self.img.getdata():
+            buf.extend([r,g,b,a])
+        #buf = [int(x*255/size) for x in range(size)]
+        #buf = self._flatten_list(self.pixels)
+        self.arr = array('B', buf)
+        self.texture.blit_buffer(self.arr, colorfmt='rgba', bufferfmt='ubyte')
 
         with self.canvas:
             self.test = InstructionGroup()
-            self.test.add(Color(1, 1, 0, mode='rgb'))
+            #self.test.add(Color(1, 1, 0, mode='rgb'))
             self.test.add(Rectangle(texture=self.texture, pos=self.pos, size=self.size, group='heh'))
 
         #self.bind(texture=self.on_texture_update)
@@ -65,6 +73,7 @@ class CanvasWidget(FloatLayout):
         self.bind(size=self.on_texture_update)
 
     def on_texture_update(self, instance=None, value=None):
+        print('on_texture_update')
         for inst in self.test.get_group('heh'):
             if hasattr(inst, 'pos'):
                 inst.pos = self.pos
@@ -88,32 +97,27 @@ class CanvasWidget(FloatLayout):
             self.touch_type = 'move'
         elif keycode[1] == 'w':
             self.touch_type = 'draw'
+        elif keycode[1] == 'e':
+            r = random.random()
+            g = random.random()
+            b = random.random()
+            print(self.parent.parent.ids.palette.add_color([r,g,b,1]))
 
     def on_touch_down(self, touch):
         if touch.button == 'scrolldown':
             print('Zoomin\' in')
-            self.set_scale(self.scale * 1.2)
+            self.set_scale(self.scale * 1.2, touch.pos)
         elif touch.button == 'scrollup':
             print('Zoomin\' out')
-            self.set_scale(self.scale / 1.2)
-
-        if self.touch_type == 'draw':
-            x,y = touch.pos
-            ratio = self.canvas_size[0] / self.scaled_size[0]
-            print('ScaledSize: %s,%s' % self.scaled_size)
-            print('CanvasSize: %s' % str(self.canvas_size))
-            print('Size: %s' % str(self.size))
-            print('Ratio: %s' % ratio)
-            print('Scale: %s' % self.scale)
-        if self.collide_point(*touch.pos):
+            self.set_scale(self.scale / 1.2, touch.pos)
+        else:
+            if self.touch_type == 'draw':
+                x,y = self.project(touch.pos)
+                r,g,b,a = self.current_color
+                self.update_pixel(int(x), int(y), r, g, b, a)
+                self.refresh()
             touch.grab(self)
         return True
-
-    def set_scale(self, scale):
-        delta_scale = self.scale - scale
-        w, h = self.canvas_size
-        self.scale = scale
-        self.size = [w * self.scale, h * self.scale]
 
     def on_touch_move(self, touch):
         if touch.grab_current == self:
@@ -123,9 +127,98 @@ class CanvasWidget(FloatLayout):
                 self.pos = (x+dx, y+dy)
             elif self.touch_type == 'draw':
                 x,y = self.project(touch.pos)
-                print('Drawing on pixels %s,%s' % (int(x), int(y)))
+                px, py = self.project(touch.ppos)
+                #self.update_pixel(int(x), int(y), 255, 0, 100, 100)
+                r,g,b,a = self.current_color
+                self.draw_line(px, py, x, y, r,g,b,a)
                 
         return True
+
+    def set_color(self, color):
+        self.current_color = color
+
+    def on_touch_up(self, touch):
+        if touch.grab_current == self:
+            touch.ungrab(self)
+        return True
+
+    def update_pixel(self, x, y, r, g, b, a):
+        w,h = self.canvas_size
+        index = int((y * w * 4) + 4 * x)
+        self.arr[index] = int(r*255)
+        self.arr[index+1] = int(g*255)
+        self.arr[index+2] = int(b*255)
+        self.arr[index+3] = int(a*255)
+        self.texture.blit_buffer(self.arr, colorfmt='rgba', bufferfmt='ubyte')
+        print('PIXEL: %s,%s' % (int(x), int(y)))
+
+    def refresh(self):
+        self.canvas.ask_update()
+
+    def draw_line(self, x0, y0, x1, y1, r,g,b,a):
+        self.update_pixel(int(x0),int(y0),r,g,b,a)
+        self.update_pixel(int(x1),int(y1),r,g,b,a)
+        print('LINE: %s, %s -> %s, %s' % (x0,y0,x1,y1))
+        x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+        steep = abs(y1-y0) > abs(x1-x0)
+        if steep:
+            x0, y0 = y0, x0
+            x1, y1 = y1, x1
+        if x0 > x1:
+            x0, x1 = x1, x0
+            y0, y1 = y1, y0
+        deltax = x1-x0
+        deltay = abs(y1-y0)
+        error = int(deltax / 2)
+        ystep = 0
+        y = y0
+        if y0 < y1:
+            ystep = 1
+        else:
+            ystep = -1
+
+        for x in range(x0,x1):
+            if steep:
+                self.update_pixel(y, x, r,g,b,a)
+            else:
+                self.update_pixel(x, y, r,g,b,a)
+            error -= deltay
+            if error < 0:
+                y = y + ystep
+                error = error + deltax
+        self.refresh()
+
+
+    def redraw_canvas(self):
+        arr = array('B', self.buf)
+        self.texture.blit_buffer(arr, colorfmt='rgba', bufferfmt='ubyte')
+
+    def is_moveable(self):
+        w, h = self.size
+        return w > Window.size[0] and h > Window.size[1]
+
+    def set_scale(self, scale, pivot):
+        delta_scale = self.scale - scale
+        prev_w, prev_h = self.size
+        c_w, c_h = self.canvas_size
+        self.scale = scale
+        w, h = (c_w * self.scale, c_h * self.scale)
+        self.size = (w, h)
+        dw = w - prev_w
+        dh = h - prev_h
+        px, py = pivot
+        x, y = self.pos
+        ratio_x =  abs(px - x) / w
+        ratio_y =  abs(py - y) / h
+        after_x = dw * ratio_x
+        after_y = dh * ratio_y
+        print('current', ratio_x, ratio_y)
+        #self.center = (x - (ax-px)*scale, y - (ay-py)*scale)
+        #if not self.is_moveable():
+        #    self.center = Window.center
+        #else:
+        x,y = self.pos
+        self.pos = (x - after_x, y - after_y)
 
     def project(self, point):
         px,py = point
@@ -133,10 +226,9 @@ class CanvasWidget(FloatLayout):
         ratio = self.canvas_size[0]/self.size[0]
         return (ratio*(px-x), ratio*(py-y))
 
-    def on_touch_up(self, touch):
-        if touch.grab_current == self:
-            touch.ungrab(self)
-        return True
+    def _flatten_list(self, lst):
+        return list(itertools.chain.from_iterable(lst))
+
 
     def resize(self):
         print('Resize %s' % self.size)
@@ -151,7 +243,7 @@ class CanvasWidget(FloatLayout):
 
 class GridWidget(Widget):
     lines = ObjectProperty((512,512))
-    visibility_density = ObjectProperty(512)
+    visibility_density = ObjectProperty(10)
     visible = ObjectProperty(True)
     
     def __init__(self, **kwargs):
@@ -185,41 +277,68 @@ class GridWidget(Widget):
 class SpriteApp(App):
     def build(self):
         #Window.clearcolor = (1, 1, 1, 1)
-        return SpriteWidget()
+        self.root_widget = SpriteWidget()
+        return self.root_widget
+
+    def lol(self, color):
+        self.root_widget.ids.canvas.set_color(color)
 
 class TransparentStrip(Button):
     def __init__(self, **kwargs):
         super(TransparentStrip, self).__init__(**kwargs)
         self.background_normal = "transparent.png"
         self.background_down = "transparent.png"
-    pass
 
 class SpriteSplitter(BoxLayout):
-    strip_cls = ObjectProperty(TransparentStrip)
+    position = StringProperty('right')
+    handle_size = NumericProperty(30)
     grabbed = False
+
+    def __init__(self, **kwargs):
+        super(SpriteSplitter, self).__init__(**kwargs)
 
     def on_touch_up(self, touch):
         if touch.grab_current == self:
             touch.ungrab(self)
             x,y = self.pos
-            if x > -100:
-                self.pos = [0, y]
-            else:
-                self.pos = [-self.width + 20 + self.min_size, y]
+            if self.position == 'left':
+                if x > -self.max_size/2:
+                    self.pos = [0, y]
+                else:
+                    self.pos = [-self.width + self.min_size, y]
+            elif self.position == 'bottom':
+                if y > -self.max_size/2:
+                    self.pos = [x, 0]
+                else:
+                    self.pos = [x, -self.height + self.min_size]
+
         return True
 
     def on_touch_down(self, touch):
-        if self.collide_point(*touch.pos):
-            touch.grab(self)
-            return True
-        return False
+        if self.position == 'left':
+            x, y = touch.pos
+            if self.collide_point(max(0, x - self.handle_size), y):
+                touch.grab(self)
+                super(SpriteSplitter, self).on_touch_down(touch)
+                return True
+        elif self.position == 'bottom':
+            x, y = touch.pos
+            if self.collide_point(x, max(0, y - self.handle_size)):
+                touch.grab(self)
+                super(SpriteSplitter, self).on_touch_down(touch)
+                return True
+        return super(SpriteSplitter, self).on_touch_down(touch)
 
     def on_touch_move(self, touch):
         if touch.grab_current == self:
             x, y = self.pos
-            dx, _ = touch.dpos
-            new_x = max(-self.width + 20 + self.min_size, min(self.max_size/2-self.width/2, x+dx))
-            self.pos = (new_x, y)
+            dx, dy = touch.dpos
+            if self.position == 'left':
+                new_x = max(-self.width + self.min_size, min(0, x+dx))
+                self.pos = (new_x, y)
+            elif self.position == 'bottom':
+                new_y = max(-self.height + self.min_size, min(0, y+dy))
+                self.pos = (x, new_y)
         return True
 
     def grab(self):
