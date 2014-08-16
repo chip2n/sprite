@@ -4,11 +4,13 @@ from kivy.properties import ListProperty
 from kivy.properties import NumericProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.anchorlayout import AnchorLayout
 
-class Palette(GridLayout):
+class PaletteGrid(GridLayout):
     color_width = NumericProperty(10)
     def __init__(self, **kwargs):
-        super(Palette, self).__init__(**kwargs)
+        super(PaletteGrid, self).__init__(**kwargs)
 
     def add_color(self, color):
         palette_color = PaletteColor(color)
@@ -20,6 +22,11 @@ class Palette(GridLayout):
         y = int((len(self.children) - 1) / self.cols) + 1
         h = min(y* self.color_width, self.rows * self.color_width)
         self.size = (w, h)
+
+class Palette(AnchorLayout):
+
+    def add_color(self, color):
+        self.ids.palette_grid.add_color(color)
 
 class PaletteColor(BoxLayout):
     color = ListProperty([0,0,0,1])

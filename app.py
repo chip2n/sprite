@@ -3,6 +3,7 @@ kivy.require('1.8.0')
 
 import events
 import palette
+import brush_panel
 
 import itertools
 from array import array
@@ -79,7 +80,6 @@ class CanvasWidget(FloatLayout):
                 inst.pos = self.pos
             if hasattr(inst, 'size'):
                 inst.size = self.size
-        pass
 
         #self.canvas.clear()
         #with self.canvas:
@@ -188,7 +188,6 @@ class CanvasWidget(FloatLayout):
                 error = error + deltax
         self.refresh()
 
-
     def redraw_canvas(self):
         arr = array('B', self.buf)
         self.texture.blit_buffer(arr, colorfmt='rgba', bufferfmt='ubyte')
@@ -275,13 +274,9 @@ class GridWidget(Widget):
 
 
 class SpriteApp(App):
-    def build(self):
-        #Window.clearcolor = (1, 1, 1, 1)
-        self.root_widget = SpriteWidget()
-        return self.root_widget
 
     def lol(self, color):
-        self.root_widget.ids.canvas.set_color(color)
+        self.root.ids.canvas.set_color(color)
 
 class TransparentStrip(Button):
     def __init__(self, **kwargs):
